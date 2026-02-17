@@ -6,7 +6,7 @@ import os
 # --- Page Config ---
 st.set_page_config(page_title="Returnly", page_icon="🔄📦", layout="wide")
 
-st.title("⚖️ Returnly")
+st.title("🔄📦 Returnly")
 st.markdown("### I will tell you if that thing you bought can be returned")
 
 # --- Sidebar: Upload Evidence ---
