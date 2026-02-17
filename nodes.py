@@ -1,4 +1,5 @@
 import streamlit as st
+import google.generativeai as genai
 from state import AuditorState
 
 # 1. This is the "Safe" way to handle keys on the web
