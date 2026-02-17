@@ -52,4 +52,4 @@ else:
 
 # --- Footer ---
 st.divider()
-st.caption("Powered by Gemini 1.5 Flash & LangGraph | Returnly v1.0")
+st.caption("Powered by Gemini & LangGraph | Returnly v1.0")
