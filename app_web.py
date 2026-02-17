@@ -10,7 +10,7 @@ st.title("⚖️ Returnly")
 st.markdown("### I will tell you if that thing you bought can be returned")
 
 # --- Sidebar: Upload Evidence ---
-st.sidebar.header("Evidence Upload")
+st.sidebar.header("Receipt Upload")
 uploaded_file = st.sidebar.file_uploader("Upload Receipt (JPG/PNG)", type=["jpg", "jpeg", "png"])
 
 if uploaded_file:
