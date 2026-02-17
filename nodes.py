@@ -1,5 +1,12 @@
 from state import AuditorState
 
+# 1. This is the "Safe" way to handle keys on the web
+# We will set the actual value in the Streamlit Dashboard later
+if "GEMINI_API_KEY" in st.secrets:
+    API_KEY = st.secrets["GEMINI_API_KEY"]
+    genai.configure(api_key=API_KEY)
+
+# --- Keep your Mock Nodes below as they are ---
 def extraction_node(state: AuditorState):
     """
     MOCK: In Phase 4, this will use Gemini Vision.
