@@ -5,95 +5,84 @@ from PIL import Image
 from datetime import datetime
 from state import AuditorState
 
-# --- 1. API Configuration (Environment Aware) ---
-API_KEY = os.environ.get("GEMINI_API_KEY") 
+# --- 1. API Configuration (Defensive) ---
+raw_key = os.environ.get("GEMINI_API_KEY") 
 
-# If we are on the web (Streamlit Cloud), this will work.
-# If we are local, the 'try' block prevents the crash you just saw.
-if not API_KEY:
+if not raw_key:
     try:
         if "GEMINI_API_KEY" in st.secrets:
-            API_KEY = st.secrets["GEMINI_API_KEY"]
+            raw_key = st.secrets["GEMINI_API_KEY"]
     except:
-        # We are local and no export was found
         pass
 
-if not API_KEY:
-    # Key will be pulled from Streamlit Secrets on the web
-    API_KEY = ""
+# IMPORTANT: .strip() removes hidden spaces/newlines that cause InvalidArgument
+API_KEY = raw_key.strip() if raw_key else None
 
-genai.configure(api_key=API_KEY)
+if API_KEY:
+    genai.configure(api_key=API_KEY)
 
-# Use the alias that worked in our diagnostic
-MODEL_NAME = 'models/gemini-flash-latest'
+# Use the most stable naming convention for the Cloud environment
+MODEL_NAME = 'gemini-1.5-flash' 
 
-# --- 2. Real AI Nodes (Quota-Optimized) ---
+# --- 2. Real AI Nodes ---
 
 def extraction_node(state: AuditorState):
     """Task: Identify Brand and Date from the photo"""
     print("--- NODE: REAL EXTRACTION ---")
+    
+    # Safety check: Ensure the image file exists
+    if not os.path.exists(state["image_path"]):
+        return {"logs": ["Error: Image file not found on server."]}
+
     model = genai.GenerativeModel(MODEL_NAME)
     img = Image.open(state["image_path"])
     
-    prompt = "Extract the Retailer name and Purchase Date (YYYY-MM-DD) from this receipt. Return ONLY those two facts."
+    prompt = "Extract Retailer name and Purchase Date (YYYY-MM-DD). Format: Retailer: [Name], Date: [Date]"
     
-    response = model.generate_content([prompt, img])
-    text = response.text.strip()
-    
-    return {
-        "retailer": text, 
-        "logs": [f"AI extracted facts: {text}"]
-    }
+    # We pass the prompt and image as a list
+    try:
+        response = model.generate_content([prompt, img])
+        text = response.text.strip()
+        return {
+            "retailer": text, 
+            "logs": [f"AI successfully analyzed image."]
+        }
+    except Exception as e:
+        return {"logs": [f"Extraction failed: {str(e)}"]}
 
 def research_node(state: AuditorState):
-    """Task: Retrieve policy from Internal Knowledge (Bypasses Search Quota)"""
+    """Task: Knowledge Research"""
     print("--- NODE: KNOWLEDGE RESEARCH ---")
     model = genai.GenerativeModel(MODEL_NAME)
+    retailer = state.get("retailer", "IKEA")
     
-    retailer = state.get("retailer", "the retailer on the receipt")
+    prompt = f"Summarize official return policy for {retailer}. Focus on window and opened/unopened rules."
     
-    # We ask the LLM to use its internal knowledge instead of the Search Tool
-    prompt = f"""
-    You are an expert on consumer rights. Based on your internal knowledge, 
-    what is the official return policy for {retailer}? 
-    
-    Please provide:
-    1. The return window (number of days).
-    2. Any nuances (opened vs unopened).
-    3. Any specific exclusions.
-    """
-    
-    response = model.generate_content(prompt)
-    
-    return {
-        "raw_policy_text": response.text,
-        "logs": [f"Retrieved {retailer} policy from internal knowledge base."]
-    }
+    try:
+        response = model.generate_content(prompt)
+        return {
+            "raw_policy_text": response.text,
+            "logs": [f"Retrieved policy knowledge."]
+        }
+    except Exception as e:
+        return {"logs": [f"Research failed: {str(e)}"]}
 
 def auditor_node(state: AuditorState):
-    """Task: Final Reasoning & Date Math"""
+    """Task: Final Reasoning"""
     print("--- NODE: REAL AUDIT ---")
     model = genai.GenerativeModel(MODEL_NAME)
     
     current_date = datetime.now().strftime("%Y-%m-%d")
-    policy = state.get("raw_policy_text", "")
-    receipt_facts = state.get("retailer", "")
+    policy = state.get("raw_policy_text", "No policy found.")
+    facts = state.get("retailer", "No retailer found.")
 
-    prompt = f"""
-    Today's Date: {current_date}
-    Receipt Data: {receipt_facts}
-    Policy Details: {policy}
+    prompt = f"Today: {current_date}. Context: {facts}. Policy: {policy}. Can I return it? VERDICT and PLAN."
     
-    TASK:
-    Analyze if the user can return the item. 
-    1. Calculate days elapsed.
-    2. Compare against the policy.
-    3. Provide a VERDICT and a brief LOGISTICS PLAN.
-    """
-    
-    response = model.generate_content(prompt)
-    
-    return {
-        "audit_report": response.text,
-        "logs": ["Performed cross-reference audit and date math."]
-    }
+    try:
+        response = model.generate_content(prompt)
+        return {
+            "audit_report": response.text,
+            "logs": ["Audit complete."]
+        }
+    except Exception as e:
+        return {"audit_report": f"Audit failed: {str(e)}", "logs": ["Audit error."]}
